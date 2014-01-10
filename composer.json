@@ -1,0 +1,24 @@
+{
+    "name": "tccltd/speck-checkout-order",
+    "description": "SpeckCheckoutOrder Package",
+    "type": "library",
+    "authors": [
+        {
+            "name": "TCC",
+            "email": "code@tcc-net.com",
+            "homepage": "http://www.tcc-net.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.0"
+   },
+    "minimum-stability" : "stable",
+    "autoload": {
+        "psr-0": {
+            "SpeckCheckoutOrder": "src/"
+        },
+        "classmap": [
+            "./Module.php"
+        ]
+    }
+}
