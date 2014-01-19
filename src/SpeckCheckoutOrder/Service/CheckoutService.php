@@ -34,27 +34,34 @@ class CheckoutService
         $order->setBillingAddress($checkoutStrategy->getBillingAddress());
 
         $customer = $checkoutStrategy->getCustomer();
+        $billee = $checkoutStrategy->getBillee();
 
         $meta = new OrderMeta();
         $meta->setCustomerTitle($customer->getTitle())
              ->setCustomerFirstName($customer->getFirstName())
-             ->setCustomerLastName($customer->getLastName())
-//             ->setCustomerEmail($customer->getEmailAddress())
+             ->setCustomerLastName($customer->getSurname())
+             ->setCustomerEmail($checkoutStrategy->getEmailAddress())
              ->setCustomerTelephone($customer->getTelephone())
              ->setCustomerAddress($order->getShippingAddress())
              ->setCustomerJobTitle($customer->getJobRole())
              ->setCustomerCompanyName($customer->getCompany())
              ->setCustomerCompanySize($customer->getCompanySize())
-//              ->setBillingFirstName()
-//              ->setBillingLastName()
-//              ->setBillingTelephone()
-             ->setBillingAddress($order->getBillingAddress());
+             ->setBillingName($billee->getName())
+             ->setBillingEmail($billee->getEmail())
+             ->setBillingTelephone($billee->getTelephone())
+             ->setBillingAddress($order->getBillingAddress())
+
+             ->setPaymentMethod($checkoutStrategy->getPaymentMethod())
+
+             // TODO: Set the actual date payment due.
+             ->setPaymentDue('NOW');
 
         $order->setMeta($meta);
 
 
         // TODO: Bridge module between Cart and Order...
         // TODO: Abstract this somewhere.
+        // TODO: I think it IS abstracted somewhere but no time to find it now...
         $recursiveDescription = function ($item) use (&$recursiveDescription) {
             $name = $item->getDescription();
             foreach ($item->getItems() as $child) {
@@ -63,10 +70,16 @@ class CheckoutService
             return $name;
         };
 
+        /* @var $item \SpeckCart\Entity\CartItem */
         foreach($cart as $item) {
             $orderLine = new OrderLine();
-            $orderLine->setOrder($order);
-            $orderLine->setDescription($recursiveDescription($item));
+            $orderLine->setOrder($order)
+                      ->setDescription($recursiveDescription($item))
+                      ->setPrice($item->getPrice(false, true))
+                      ->setTax($item->getTax(true))
+                      ->setQuantityInvoiced((int)$item->getQuantity())
+                      ->setQuantityRefunded(0)
+                      ->setQuantityShipped(0);
 
             $meta = new OrderLineMeta();
             foreach ($checkoutStrategy->getDelegates()[$item->getCartItemId()] as $delegate) {
@@ -75,15 +88,6 @@ class CheckoutService
             $orderLine->setMeta($meta);
             $order->addItem($orderLine);
         }
-
-//         echo '===== ORDER =====' . PHP_EOL;
-//         var_dump($order);
-//         echo '===== CART =====' . PHP_EOL;
-//         var_dump($cart);
-//         echo '===== STRATEGY =====' . PHP_EOL;
-//         var_dump($checkoutStrategy);
-//         die("SpeckCheckoutOrder - CheckoutService");
-
         return $order;
     }
 
