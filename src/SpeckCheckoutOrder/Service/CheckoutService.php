@@ -50,11 +50,8 @@ class CheckoutService
              ->setBillingEmail($billee->getEmail())
              ->setBillingTelephone($billee->getTelephone())
              ->setBillingAddress($order->getBillingAddress())
-
              ->setPaymentMethod($checkoutStrategy->getPaymentMethod())
-
-             // TODO: Set the actual date payment due.
-             ->setPaymentDue('NOW');
+             ->setPaymentDue($checkoutStrategy->getPaymentDate()->format('Ymd'));
 
         $order->setMeta($meta);
 
