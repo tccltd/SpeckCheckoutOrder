@@ -82,6 +82,7 @@ class CheckoutService
             foreach ($checkoutStrategy->getDelegates()[$item->getCartItemId()] as $delegate) {
                 $meta->addDelegate($delegate->getFirstName(), $delegate->getSurname(), $delegate->getEmail());
             }
+            $meta->setProductId($item->getMetadata()->getProductId());
             $orderLine->setMeta($meta);
             $order->addItem($orderLine);
         }
