@@ -7,6 +7,8 @@ use SpeckOrder\Entity\OrderLine;
 use SpeckOrder\Entity\OrderLineMeta;
 use SpeckOrder\Entity\OrderMeta;
 use TccCheckout\Strategy\TccCheckoutStrategy;
+use SpeckCatalogCart\Model\CartProductMeta;
+use SpeckCartVoucher\Entity\CartVoucherMeta;
 
 class CheckoutService
 {
@@ -68,7 +70,7 @@ class CheckoutService
         };
 
         /* @var $item \SpeckCart\Entity\CartItem */
-        foreach($cart as $item) {
+        foreach(array_reverse($cart->getItems()) as $item) {
             $orderLine = new OrderLine();
             $orderLine->setOrder($order)
                       ->setDescription($recursiveDescription($item))
@@ -79,10 +81,13 @@ class CheckoutService
                       ->setQuantityShipped(0);
 
             $meta = new OrderLineMeta();
-            foreach ($checkoutStrategy->getDelegates()[$item->getCartItemId()] as $delegate) {
-                $meta->addDelegate($delegate->getFirstName(), $delegate->getSurname(), $delegate->getEmail());
+            if($item->getMetadata() instanceof CartProductMeta) {
+                foreach ($checkoutStrategy->getDelegates()[$item->getCartItemId()] as $delegate) {
+                    $meta->addDelegate($delegate->getFirstName(), $delegate->getSurname(), $delegate->getEmail());
+                }
             }
             $meta->setProductId($item->getMetadata()->getProductId());
+            $meta->setIsVoucher($item->getMetadata() instanceof CartVoucherMeta);
             $orderLine->setMeta($meta);
             $order->addItem($orderLine);
         }
