@@ -2,13 +2,13 @@
 
 namespace SpeckCheckoutOrder\Service;
 
-use SpeckCart\Entity\CartItem;
-use SpeckCartVoucher\Entity\CartVoucherMeta;
+use SpeckCart\Entity\CartItemInterface;
 use SpeckOrder\Entity\Order;
+use SpeckOrder\Entity\OrderInterface;
 use SpeckOrder\Entity\OrderLine;
+use SpeckOrder\Entity\OrderLineInterface;
 use SpeckOrder\Entity\OrderLineMeta;
 use SpeckOrder\Entity\OrderMeta;
-use TccCheckout\Strategy\TccCheckoutStrategy;
 use Zend\EventManager\EventManagerAwareInterface;
 use Zend\EventManager\EventManagerAwareTrait;
 
@@ -63,79 +63,81 @@ class CheckoutService implements EventManagerAwareInterface
         $order->setMeta($meta);
 
 
-        // TODO: Bridge module between Cart and Order...
-        // TODO: Abstract this somewhere.
-        // TODO: I think it IS abstracted somewhere but no time to find it now...
-        $recursiveDescription = function ($item) use (&$recursiveDescription) {
-            $name['name'] = $item->getDescription();
-
-            foreach ($item->getItems() as $child) {
-                $name['children'][] = $recursiveDescription($child);
-            }
-            return $name;
-        };
-
-        // Recursive function to strip out any cart items that have product ids in the metadata
-        $recursiveProduct = function(CartItem $item) use (&$recursiveProduct, $order, $recursiveDescription, $checkoutStrategy) {
-            // Loop over the child items in the current item
-            foreach($item->getItems() as $childItem) {
-                // Look down to the deepest level first
-                $recursiveProduct($childItem);
-
-                // If there is a product ID on the current child item... remove it
-                if($childItem->getMetadata()->getProductId()) {
-                    $item->removeItem($childItem);
-                }
-            }
-
-            /* @var $meta \SpeckCatalogCart\Model\CartProductMeta */
-            $meta = $item->getMetadata();
-
-            // If there is a product ID or it's a CartVoucherMeta item
-            if($meta->getProductId() || (($meta instanceof CartVoucherMeta) && !$item->getParentItemId())) {
-                // Create the OrderLine item
-                $orderLine = new OrderLine();
-                $orderLine->setOrder($order)
-                    ->setDescription($recursiveDescription($item))
-                    ->setPrice($item->getPrice(false, true))
-                    ->setTax($item->getTax(true))
-                    ->setQuantityInvoiced((int)$item->getQuantity())
-                    ->setQuantityRefunded(0)
-                    ->setQuantityShipped(0);
-
-                // Create the relevant meta items
-                $olMeta = new OrderLineMeta();
-
-                // Set the delegates against the meta item.
-                $delegates = $checkoutStrategy->getDelegates();
-                if(isset($delegates[$item->getCartItemId()])) {
-                    foreach ($checkoutStrategy->getDelegates()[$item->getCartItemId()] as $delegate) {
-                        $olMeta->addDelegate($delegate->getFirstName(), $delegate->getSurname(), $delegate->getEmail());
-                    }
-                }
-
-                // Set the product id correctly
-                $olMeta->setProductId($meta->getProductId());
-                $olMeta->setItemNumber($meta->getItemNumber());
-
-                // See if anyone wants to add any additional metadata about this item
-                $this->getEventManager()->trigger(
-                    'additionalMetaRequest',
-                    $this,
-                    ['meta' => $olMeta, 'cartItem' => $item, 'checkoutStrategy' => $checkoutStrategy]
-                );
-
-                $orderLine->setMeta($olMeta);
-                $order->addItem($orderLine);
-            }
-        };
-
-        // Loop over all the items and call the recursive function
-        foreach($cart->getItems() as $item) {
-            $recursiveProduct($item);
+        foreach($cart as $cartItem) {
+            $order->addItem($this->createOrderLineFromCartItem($cartItem, $order, null));
         }
+
         return $order;
     }
+
+
+    protected function createOrderLineFromCartItem(CartItemInterface $cartItem, OrderInterface $order, OrderLineInterface $parentLine=null)
+    {
+        $orderLine = new OrderLine();
+        $orderLine->setOrder($order)
+            ->setDescription($cartItem->getDescription())
+            ->setPrice($cartItem->getPrice())
+            ->setTax($cartItem->getTax())
+            ->setQuantityInvoiced($cartItem->getQuantity())
+            ->setQuantityRefunded(0)
+            ->setQuantityShipped(0);
+
+        if($parentLine) {
+            $orderLine->setParentLineId($parentLine->getId());
+        }
+
+        $cartItemMeta = $cartItem->getMetadata();
+        $olMeta = new OrderLineMeta();
+
+        /* @var $checkoutStrategy \TccCheckout\Strategy\TccCheckoutStrategy */
+        $checkoutStrategy = $this->checkoutService->getCheckoutStrategy();
+
+        $delegates = $checkoutStrategy->getDelegates();
+        if(isset($delegates[$cartItem->getCartItemId()])) {
+            foreach($checkoutStrategy->getDelegates()[$cartItem->getCartItemId()] as $delegate) {
+                $olMeta->addDelegate($delegate->getFirstName(), $delegate->getSurname(), $delegate->getEmail());
+            }
+        }
+
+        // TODO: Don't hard code this
+        switch($cartItemMeta->getProductTypeId()) {
+            case 1: $category = 'Shell'; break;
+            case 2: $category = 'Product'; break;
+            case 3: $category = 'Course'; break;
+            case 4: $category = 'Quizical Code'; break;
+            case 5: $category = 'Book'; break;
+            case 6: $category = 'Examination'; break;
+            case 7: $category = 'Course Group'; break;
+            case 8: $category = 'Voucher'; break;
+            default: $category = "";
+        }
+
+        $olMeta->setProductType($category);
+        $olMeta->setProductId($cartItemMeta->getProductId());
+        $olMeta->setItemNumber($cartItemMeta->getItemNumber());
+        $olMeta->setManufacturer($cartItemMeta->getProductManufacturer());
+
+        $orderLine->setMeta($olMeta);
+
+        $this->getEventManager()->trigger(
+            'additionalMetaRequest',
+            $this,
+            [
+                'meta'             => $olMeta,
+                'cartItem'         => $cartItem,
+                'checkoutStragegy' => $checkoutStrategy,
+                'orderLine'        => $orderLine,
+            ]
+        );
+
+        foreach ($cartItem->getItems() as $item) {
+            $orderLine->addItem($this->createOrderLineFromCartItem($item, $order, $orderLine));
+        }
+
+        return $orderLine;
+    }
+
+
 
     /**
      * @return \SpeckCatalogCart\Service\CartService
