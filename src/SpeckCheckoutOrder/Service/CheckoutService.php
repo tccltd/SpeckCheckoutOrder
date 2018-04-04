@@ -76,7 +76,7 @@ class CheckoutService implements EventManagerAwareInterface
         $orderLine = new OrderLine();
         $orderLine->setOrder($order)
             ->setDescription($cartItem->getDescription())
-            ->setPrice($cartItem->getPrice())
+            ->setPrice($cartItem->getPrice(false, true))
             ->setTax($cartItem->getTax())
             ->setQuantityInvoiced($cartItem->getQuantity())
             ->setQuantityRefunded(0)
