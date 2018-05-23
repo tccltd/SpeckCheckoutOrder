@@ -58,7 +58,10 @@ class CheckoutService implements EventManagerAwareInterface
              ->setBillingTelephone($billee->getTelephone())
              ->setBillingAddress($order->getBillingAddress())
              ->setPaymentMethod($checkoutStrategy->getPaymentMethod())
-             ->setPaymentDue($checkoutStrategy->getPaymentDate()->format('Ymd'));
+             ->setPaymentDue($checkoutStrategy->getPaymentDate()->format('Ymd'))
+             ->setConsentCommunication($checkoutStrategy->getCommunicationConsent())
+             ->setConsentTerms($checkoutStrategy->getTermsAndConditionsConsent())
+             ->setConsentIpAddress($checkoutStrategy->getIpAddress());
 
         $order->setMeta($meta);
 
