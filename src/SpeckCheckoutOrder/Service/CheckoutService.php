@@ -56,6 +56,7 @@ class CheckoutService implements EventManagerAwareInterface
              ->setBillingName($billee->getName())
              ->setBillingEmail($billee->getEmail())
              ->setBillingTelephone($billee->getTelephone())
+             ->setBillingPONumber($billee->getPONumber())
              ->setBillingAddress($order->getBillingAddress())
              ->setPaymentMethod($checkoutStrategy->getPaymentMethod())
              ->setPaymentDue($checkoutStrategy->getPaymentDate()->format('Ymd'))
